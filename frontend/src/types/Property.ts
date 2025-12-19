@@ -49,3 +49,15 @@ export interface Property {
 }
 
 export type PropertyStatus = 'en_attente' | 'validee' | 'rejetee';
+
+export interface SimilarProperty {
+  _id: string;
+  title: string;
+  image?: string | null;
+  price: number;
+  propertyType?: string;
+  bedrooms?: number;
+  area?: number;
+  city?: string | null;
+  address?: string | null;
+}

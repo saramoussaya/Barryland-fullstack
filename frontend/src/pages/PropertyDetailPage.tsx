@@ -5,6 +5,7 @@ import {
   Calendar, ChevronLeft, ChevronRight, Check, Briefcase, AlertCircle
 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
+import SimilarProperties from '../components/SimilarProperties';
 import { useProperty } from '../contexts/PropertyContext';
 import { useToast } from '../contexts/ToastContext';
 
@@ -315,6 +316,8 @@ const PropertyDetailPage: React.FC = () => {
                 </div>
               </div>
             </div>
+            {/* Similar properties */}
+            <SimilarProperties propertyId={id} />
           </div>
 
           {/* Sidebar */}

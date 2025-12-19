@@ -259,6 +259,103 @@ router.get('/featured', async (req, res) => {
   }
 });
 
+// @route   GET /api/properties/:id/similar
+// @desc    Get similar properties for a given property id
+// @access  Public
+router.get('/:id/similar', async (req, res) => {
+  try {
+    const propId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(propId)) {
+      return res.status(400).json({ success: false, message: 'Identifiant invalide' });
+    }
+
+    const current = await Property.findById(propId).lean();
+    if (!current) {
+      return res.status(404).json({ success: false, message: 'Propriété non trouvée' });
+    }
+
+    // Base query: same propertyType and same transactionType, exclude current
+    // Prefer showing public active properties, but also include properties owned by the same owner
+    // so that a user viewing their own (pending) ad can still see their other listings.
+    const ownerId = current.owner;
+    const baseQuery = {
+      propertyType: current.propertyType,
+      transactionType: current.transactionType,
+      _id: { $ne: current._id },
+      $or: [ { status: 'active' } ]
+    };
+    if (ownerId) {
+      baseQuery.$or.push({ owner: ownerId });
+    }
+
+    // Fetch a candidate pool (limit a bit higher to allow re-ranking)
+    const poolLimit = 20;
+    let candidates = await Property.find(baseQuery)
+      .select('title images price propertyType bedrooms area location createdAt')
+      .lean()
+      .limit(poolLimit);
+
+    if (!Array.isArray(candidates) || candidates.length === 0) {
+      return res.json({ success: true, data: { properties: [] } });
+    }
+
+    // Compute optional matching score for each candidate
+    const areaMin = current.area ? current.area * 0.9 : null;
+    const areaMax = current.area ? current.area * 1.1 : null;
+    const priceMin = current.price ? current.price * 0.85 : null;
+    const priceMax = current.price ? current.price * 1.15 : null;
+
+    const scored = candidates.map(c => {
+      let score = 0;
+      try {
+        if (current.location && current.location.city && c.location && c.location.city) {
+          if (String(current.location.city).toLowerCase() === String(c.location.city).toLowerCase()) score += 40;
+        }
+      } catch (e) {}
+      if (typeof current.bedrooms === 'number' && typeof c.bedrooms === 'number' && current.bedrooms === c.bedrooms) score += 15;
+      if (areaMin !== null && areaMax !== null && typeof c.area === 'number') {
+        if (c.area >= areaMin && c.area <= areaMax) score += 15;
+      }
+      if (priceMin !== null && priceMax !== null && typeof c.price === 'number') {
+        if (c.price >= priceMin && c.price <= priceMax) score += 15;
+      }
+      if (Array.isArray(c.images) && c.images.length > 0) score += 5;
+      return { prop: c, score };
+    });
+
+    // Sort by score then by createdAt
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const ta = a.prop.createdAt ? new Date(a.prop.createdAt).getTime() : 0;
+      const tb = b.prop.createdAt ? new Date(b.prop.createdAt).getTime() : 0;
+      return tb - ta;
+    });
+
+    // Limit results to 4-6 based on query param
+    const requested = parseInt(req.query.limit || '4');
+    const limit = Math.max(4, Math.min(6, isNaN(requested) ? 4 : requested));
+    const selected = scored.slice(0, limit).map(s => s.prop).filter(Boolean);
+
+    const out = selected.map(p => ({
+      _id: p._id,
+      title: p.title,
+      image: (Array.isArray(p.images) && p.images.length > 0) ? (p.images.find(i => i.isPrimary) || p.images[0]).url : null,
+      price: p.price,
+      propertyType: p.propertyType,
+      bedrooms: p.bedrooms,
+      area: p.area,
+      city: p.location && p.location.city ? p.location.city : null,
+      address: p.location && p.location.address ? p.location.address : null
+    }));
+
+    res.json({ success: true, data: { properties: out } });
+
+  } catch (error) {
+    console.error('Erreur lors de la récupération des propriétés similaires:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la récupération des propriétés similaires' });
+  }
+});
+
 // @route   GET /api/properties/:id
 // @desc    Get single property
 // @access  Public
