@@ -54,8 +54,11 @@ const Header: React.FC = () => {
 
           {/* Navigation - Desktop */}
           <nav className="hidden lg:flex items-center space-x-4">
-            <Link to="/search" className="text-gray-700 hover:text-emerald-600 transition-colors">
-              Rechercher
+            <Link to="/search?type=vente" className="text-gray-700 hover:text-emerald-600 transition-colors">
+              Acheter
+            </Link>
+            <Link to="/search?type=location" className="text-gray-700 hover:text-emerald-600 transition-colors">
+              Louer
             </Link>
             {user ? (
               <>
@@ -164,11 +167,18 @@ const Header: React.FC = () => {
             {/* Mobile Navigation */}
             <nav className="flex flex-col space-y-3">
               <Link
-                to="/search"
+                to="/search?type=vente"
                 className="text-gray-700 hover:text-emerald-600 transition-colors py-2"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Rechercher
+                Acheter
+              </Link>
+              <Link
+                to="/search?type=location"
+                className="text-gray-700 hover:text-emerald-600 transition-colors py-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Louer
               </Link>
               {user ? (
                   <>

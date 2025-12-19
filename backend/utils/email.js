@@ -174,6 +174,28 @@ const emailTemplates = {
     `
   }),
 
+  'contact-confirmation': (data) => ({
+    subject: 'Confirmation de votre demande – Bien immobilier',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h1 style="color: #10B981; font-size: 24px; margin: 0;">BarryLand</h1>
+        </div>
+
+        <div style="background: #F9FAFB; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+          <p style="color: #1F2937; font-size: 16px; margin: 0 0 12px;">Bonjour ${data.firstName || data.name || ''},</p>
+          <p style="color: #374151; line-height: 1.6; margin-bottom: 12px;">Nous avons bien reçu votre demande concernant le bien "<strong>${data.propertyTitle || 'le bien immobilier'}</strong>".</p>
+          <p style="color: #374151; line-height: 1.6; margin-bottom: 12px;">Un conseiller de l'agence va étudier votre message et vous recontacter dans les meilleurs délais.</p>
+          <p style="color: #374151; line-height: 1.6;">Merci d'avoir contacté BarryLand.</p>
+        </div>
+
+        <div style="font-size: 13px; color: #6B7280; text-align: center;">
+          <p>Ce message vous a été envoyé automatiquement par BarryLand. Pour toute question, répondez depuis votre espace ou contactez notre support.</p>
+        </div>
+      </div>
+    `
+  }),
+
   'property-alert': (data) => ({
     subject: 'Nouvelle propriété correspondant à vos critères !',
     html: `

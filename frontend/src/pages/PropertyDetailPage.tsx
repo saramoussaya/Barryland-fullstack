@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   MapPin, Heart, Share2, Camera, Bed, Bath, Square, 
@@ -8,6 +8,7 @@ import StatusBadge from '../components/StatusBadge';
 import SimilarProperties from '../components/SimilarProperties';
 import { useProperty } from '../contexts/PropertyContext';
 import { useToast } from '../contexts/ToastContext';
+import apiClient from '../utils/apiClient';
 
 const PropertyDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +25,9 @@ const PropertyDetailPage: React.FC = () => {
   const [message, setMessage] = useState('');
   const [showMessage, setShowMessage] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [alreadyContacted, setAlreadyContacted] = useState(false);
 
   // Accept either p.id or p._id to be resilient to backend id shapes
   const property = properties.find(p => String((p as any).id || (p as any)._id) === String(id));
@@ -118,6 +122,29 @@ const PropertyDetailPage: React.FC = () => {
   };
 
   // Inline contact form submission handler will be defined in the form onSubmit
+  // On load, check with backend if this user/email already contacted this property
+  useEffect(() => {
+    let mounted = true;
+    const checkContacted = async () => {
+      try {
+        const propertyId = property?._id || property?.id || id;
+        if (!propertyId) return;
+        // If user previously submitted while logged-out we may have stored their email locally
+        const storedEmail = localStorage.getItem(`contacted:${propertyId}`) || undefined;
+        const query = storedEmail ? `?email=${encodeURIComponent(storedEmail)}` : '';
+        const resp = await apiClient.get(`/messages/contacted/${propertyId}${query}`);
+        if (!mounted) return;
+        if (resp && resp.data && resp.data.alreadyContacted) {
+          setAlreadyContacted(true);
+          setSent(true);
+        }
+      } catch (err) {
+        console.error('Erreur vérification alreadyContacted', err);
+      }
+    };
+    checkContacted();
+    return () => { mounted = false; };
+  }, [id, property]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -370,12 +397,64 @@ const PropertyDetailPage: React.FC = () => {
                 if (Object.keys(newErrors).length > 0) return;
 
                 try {
-                  // TODO: call backend API to send message
-                  showToast('Message envoyé à l\'agence', 'success');
-                  // clear message field only
-                  setMessage('');
+                  setSending(true);
+                  // Normalize message value and log state for debugging
+                  const msgValue = (message ?? '').toString().trim();
+                  console.log('STATE message:', message, '-> normalized:', msgValue);
+                  const payload = {
+                    name: `${String(firstName).trim()} ${String(lastName).trim()}`.trim(),
+                    firstName: String(firstName).trim(),
+                    lastName: String(lastName).trim(),
+                    email: String(contactEmail).trim(),
+                    phone: String(contactPhone).trim(),
+                    propertyId: property._id || property.id || undefined,
+                    message: msgValue || 'Demande d\'informations'
+                  };
+                  console.log('PAYLOAD ENVOYÉ :', payload);
+                  console.log('PAYLOAD JSON:', JSON.stringify(payload));
+                  const resp = await apiClient.post('/messages/contact', payload, { headers: { 'Content-Type': 'application/json' } });
+                  console.log('Contact response:', resp?.data);
+                  if (resp?.data?.success) {
+                    showToast('Votre message a été envoyé avec succès ! Notre équipe vous contactera rapidement.', 'success');
+                    // persist a local marker so the form stays disabled for this property even after logout
+                    try {
+                      const propId = payload.propertyId;
+                      if (propId && payload.email) {
+                        localStorage.setItem(`contacted:${propId}`, String(payload.email).trim().toLowerCase());
+                      }
+                    } catch (e) { void e; }
+                    setSent(true);
+                    setMessage('');
+                  } else {
+                    showToast(resp?.data?.message || 'Erreur lors de l\'envoi du message', 'error');
+                  }
                 } catch (err) {
-                  try { showToast('Erreur lors de l\'envoi du message', 'error'); } catch(e) { void e; }
+                  console.error('contact send error', err);
+                  // Show server-provided message when available
+                  const serverData = (err as any)?.response?.data;
+                  const serverMsg = serverData?.message;
+                  const missing: string[] = Array.isArray(serverData?.missing) ? serverData.missing : [];
+                  if (missing.length > 0) {
+                    // Build formErrors from missing fields
+                    const newErrs: Record<string,string> = {};
+                    missing.forEach(f => {
+                      // map backend field names to form fields if necessary
+                      if (f === 'firstName') newErrs.firstName = 'Prénom requis';
+                      else if (f === 'lastName') newErrs.lastName = 'Nom requis';
+                      else if (f === 'email') newErrs.email = 'Email requis';
+                      else if (f === 'phone') newErrs.phone = 'Téléphone requis';
+                      else if (f === 'message') newErrs.message = 'Message requis';
+                      else newErrs[f] = 'Champ requis';
+                    });
+                    setFormErrors(prev => ({ ...prev, ...newErrs }));
+                    try { showToast(serverMsg || 'Certains champs sont manquants', 'error'); } catch(e) { void e; }
+                  } else if (serverMsg) {
+                    try { showToast(serverMsg, 'error'); } catch (e) { void e; }
+                  } else {
+                    try { showToast('Erreur lors de l\'envoi du message', 'error'); } catch(e) { void e; }
+                  }
+                } finally {
+                  setSending(false);
                 }
               }} className="space-y-4">
                 <div>
@@ -384,7 +463,8 @@ const PropertyDetailPage: React.FC = () => {
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.firstName ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500`}
+                    disabled={sent || alreadyContacted}
+                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.firstName ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500 ${(sent || alreadyContacted) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="Prénom"
                   />
                   {formErrors.firstName && <p className="text-red-500 text-sm mt-1">{formErrors.firstName}</p>}
@@ -396,7 +476,8 @@ const PropertyDetailPage: React.FC = () => {
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.lastName ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500`}
+                    disabled={sent || alreadyContacted}
+                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.lastName ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500 ${(sent || alreadyContacted) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="Nom de famille"
                   />
                   {formErrors.lastName && <p className="text-red-500 text-sm mt-1">{formErrors.lastName}</p>}
@@ -408,7 +489,8 @@ const PropertyDetailPage: React.FC = () => {
                     type="email"
                     value={contactEmail}
                     onChange={(e) => setContactEmail(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.email ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500`}
+                    disabled={sent || alreadyContacted}
+                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.email ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500 ${(sent || alreadyContacted) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="Email"
                   />
                   {formErrors.email && <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>}
@@ -420,7 +502,8 @@ const PropertyDetailPage: React.FC = () => {
                     type="tel"
                     value={contactPhone}
                     onChange={(e) => setContactPhone(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.phone ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500`}
+                    disabled={sent || alreadyContacted}
+                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.phone ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500 ${(sent || alreadyContacted) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="Téléphone"
                   />
                   {formErrors.phone && <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>}
@@ -435,12 +518,21 @@ const PropertyDetailPage: React.FC = () => {
                 {showMessage && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                    <textarea rows={4} value={message} onChange={(e) => setMessage(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500" />
+                    <textarea rows={4} value={message} disabled={sent || alreadyContacted} onChange={(e) => setMessage(e.target.value)} className={`w-full border ${formErrors.message ? 'border-red-500' : 'border-gray-300'} rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 ${(sent || alreadyContacted) ? 'bg-gray-100 cursor-not-allowed' : ''}`} />
+                    {formErrors.message && <p className="text-red-500 text-sm mt-1">{formErrors.message}</p>}
                   </div>
                 )}
 
                 <div>
-                  <button type="submit" className="w-full bg-red-600 text-white py-3 rounded-full font-semibold hover:bg-red-700 transition-colors">Contacter l'agence</button>
+                  {alreadyContacted ? (
+                    <div className="w-full bg-gray-100 text-gray-700 py-3 rounded-full text-center font-medium">Vous avez déjà contacté l'agence pour ce bien. Un conseiller vous recontactera prochainement.</div>
+                  ) : sent ? (
+                    <div className="w-full bg-gray-100 text-gray-700 py-3 rounded-full text-center font-medium">Votre message a été envoyé avec succès ! Notre équipe vous contactera rapidement.</div>
+                  ) : (
+                    <button type="submit" disabled={sending} className={`w-full bg-red-600 text-white py-3 rounded-full font-semibold hover:bg-red-700 transition-colors ${sending ? 'opacity-80 cursor-wait' : ''}`}>
+                      {sending ? 'Envoi en cours...' : 'Contacter l\'agence'}
+                    </button>
+                  )}
                 </div>
 
                 {/* Owner phone removed from bottom as requested */}
