@@ -653,7 +653,18 @@ router.put('/properties/:id/status', adminAuth, [
       if (req.body && req.body.featured) {
         property.priority = 'featured';
         property.isPromoted = true;
+        // Business flags
+        property.isFeatured = true;
+      } else {
+        property.isFeatured = false;
       }
+      // mark approved
+      property.isApproved = true;
+    }
+    else {
+      // if not active, ensure flags are unset
+      property.isApproved = false;
+      property.isFeatured = false;
     }
 
     await property.save();

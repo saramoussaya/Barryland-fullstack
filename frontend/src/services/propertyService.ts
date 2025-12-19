@@ -69,3 +69,8 @@ export const getSimilarProperties = async (id: string, limit = 4) => {
   const response = await apiClient.get(`/properties/${id}/similar`, { params: { limit } });
   return response.data;
 };
+
+export const getFeaturedProperties = async (limit = 6) => {
+  const response = await apiClient.get('/properties/featured', { params: { limit } });
+  return response.data;
+};

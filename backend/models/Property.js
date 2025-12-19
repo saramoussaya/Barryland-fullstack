@@ -160,6 +160,17 @@ const propertySchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Approbation par administrateur et flag vedette
+  isApproved: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  isFeatured: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
   promotionExpiry: Date,
   // Date de publication effective (remplie lors de l'approbation par un administrateur)
   publishedAt: Date,

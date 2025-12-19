@@ -29,13 +29,34 @@ router.put(
       }
 
       // Mise à jour du statut et des informations de modération
-      property.status = req.body.status;
+      // Normalize status values to internal representation and set approval/featured flags
+      if (req.body.status === 'validee') {
+        property.status = 'active';
+        property.isApproved = true;
+        // admin may send featured boolean to mark as featured during moderation
+        property.isFeatured = !!req.body.featured;
+      } else if (req.body.status === 'rejetee') {
+        property.status = 'rejected';
+        property.isApproved = false;
+        property.isFeatured = false;
+      } else {
+        property.status = req.body.status;
+      }
+
       property.moderationInfo = {
         moderatedBy: req.user.id,
         moderatedAt: new Date(),
         rejectionReason: req.body.status === 'rejetee' ? req.body.rejectionReason : null,
         moderationNotes: req.body.moderationNotes || null
       };
+
+      // Ensure publishedAt / expiresAt when approved
+      if (property.status === 'active') {
+        property.publishedAt = property.publishedAt || new Date();
+        if (!property.expiresAt || property.expiresAt < new Date()) {
+          property.expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+        }
+      }
 
       await property.save();
 

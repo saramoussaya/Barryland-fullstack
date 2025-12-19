@@ -54,10 +54,27 @@ export interface SimilarProperty {
   _id: string;
   title: string;
   image?: string | null;
+  mainImage?: string | null;
   price: number;
   propertyType?: string;
   bedrooms?: number;
   area?: number;
   city?: string | null;
   address?: string | null;
+}
+
+export interface FeaturedProperty {
+  _id: string;
+  title: string;
+  price: number;
+  propertyType?: string;
+  city?: string | null;
+  mainImage?: string | null;
+  createdAt?: string;
+  type?: string | null;
+  rooms?: number | null;
+  surface?: number | null;
+  description?: string;
+  isFavorite?: boolean;
+  imagesCount?: number;
 }

@@ -14,7 +14,7 @@ interface PropertyContextType {
   addProperty: (property: Partial<Property>) => Promise<void>;
   updateProperty: (id: string, property: Partial<Property>) => Promise<void>;
   deleteProperty: (id: string) => Promise<void>;
-  toggleFavorite: (id: string) => Promise<void>;
+  toggleFavorite: (id: string) => Promise<boolean>;
   fetchMyProperties: () => Promise<void>;
   fetchFavorites: () => Promise<Property[]>;
   refreshProperties: (filters?: any) => Promise<Property[]>;
@@ -560,7 +560,7 @@ export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  const toggleFavorite = async (id: string) => {
+  const toggleFavorite = async (id: string): Promise<boolean> => {
     setError(null);
     setLoading(true);
 
@@ -592,14 +592,12 @@ export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }
           else removeLocalFavoriteId(id);
         } catch (_) { /* ignore storage errors */ }
 
-        try { showToast(newFavState ? 'Annonce ajoutée à vos favoris' : 'Annonce retirée de vos favoris', 'success'); } catch(e) { void e; }
         setLoading(false);
-        return;
+        return newFavState;
       } catch (err) {
         setLoading(false);
         setError('Erreur interne en gérant le favori localement');
-        try { showToast('Erreur en gérant le favori localement', 'error'); } catch(e) { void e; }
-        return;
+        throw err;
       }
     }
 
@@ -681,8 +679,12 @@ export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
       }
 
-      try { showToast(data?.message || (data?.isFavorite ? 'Ajouté aux favoris' : 'Retiré des favoris'), 'success'); } catch(e) { void e; }
+      // Determine final favorite state to return to caller
+      const finalFav = (data && typeof data?.isFavorite === 'boolean')
+        ? data.isFavorite
+        : (returnedProp ? (normalizeProperty(returnedProp) as any).isFavorite ?? newFavState : newFavState);
       setLoading(false);
+      return finalFav;
     } catch (err: any) {
       // If server reports property not found, keep optimistic favorite locally and persist it so it doesn't disappear
       const serverMessage = err?.response?.data?.message || err?.message || '';
@@ -694,9 +696,8 @@ export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }
           if (!currentIds.includes(id)) currentIds.push(id);
           saveLocalFavoriteIds(currentIds);
         } catch (e) { /* ignore storage errors */ }
-        try { showToast('Favori ajouté localement (propriété non trouvée sur le serveur). Il sera synchronisé plus tard.', 'warning'); } catch (e) { void e; }
         setLoading(false);
-        return;
+        return newFavState;
       }
 
       // rollback for other errors
@@ -707,9 +708,8 @@ export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }
       setError(message);
       // log detailed server response when present
       try { console.error('toggleFavorite error response:', err?.response?.data || err); } catch(e) { void e; }
-      try { showToast(message, 'error'); } catch(e) { void e; }
       setLoading(false);
-      return;
+      throw err;
     }
   };
 

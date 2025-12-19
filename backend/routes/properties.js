@@ -232,22 +232,43 @@ router.get('/', [
 // @access  Public
 router.get('/featured', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 6;
+    const limit = Math.max(4, Math.min(6, parseInt(req.query.limit) || 6));
 
+    // Business rule: only properties explicitly approved by an admin and flagged as featured
     const properties = await Property.find({
-      status: 'active',
-      $or: [
-        { priority: 'featured' },
-        { priority: 'premium' },
-        { isPromoted: true }
-      ]
+      isApproved: true,
+      isFeatured: true,
+      status: 'active'
     })
+    .select('title images price propertyType location createdAt transactionType bedrooms area description')
     .populate('owner', 'name email phone avatar isVerified')
-    .sort({ priority: -1, views: -1, createdAt: -1 })
+    .sort({ 'moderationInfo.moderatedAt': -1, createdAt: -1 })
     .limit(limit)
     .lean();
 
-    const outProps = req.user ? await markFavoritesForUser(properties, req.user.id) : properties;
+    // Map images -> mainImage for frontend convenience
+    const mapped = (properties || []).map(p => {
+      const mainImg = (Array.isArray(p.images) && p.images.length > 0)
+        ? (p.images.find(i => i.isPrimary) || p.images[0]).url
+        : null;
+      return {
+        _id: p._id,
+        title: p.title,
+        price: p.price,
+        propertyType: p.propertyType,
+        type: p.transactionType || p.type || null,
+        rooms: typeof p.bedrooms === 'number' ? p.bedrooms : (p.bedrooms ? Number(p.bedrooms) : null),
+        surface: typeof p.area === 'number' ? p.area : (p.area ? Number(p.area) : null),
+        description: p.description || '',
+        imagesCount: Array.isArray(p.images) ? p.images.length : 0,
+        city: p.location && p.location.city ? p.location.city : null,
+        mainImage: mainImg,
+        createdAt: p.createdAt,
+        owner: p.owner
+      };
+    });
+
+    const outProps = req.user ? await markFavoritesForUser(mapped, req.user.id) : mapped;
     res.json({ success: true, data: { properties: outProps } });
 
   } catch (error) {

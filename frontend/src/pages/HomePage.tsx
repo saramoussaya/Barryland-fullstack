@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Search, MapPin, Shield, Users, Home, Building, TreePine, ArrowRight, Star} from 'lucide-react';
 import PropertyCard from '../components/PropertyCard';
+import FeaturedProperties from '../components/FeaturedProperties';
 import { useProperty } from '../contexts/PropertyContext';
 
 const HomePage: React.FC = () => {
@@ -122,35 +123,7 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* Featured Properties Section */}
-      <section className="py-16 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Biens en vedette
-            </h2>
-            <p className="text-xl text-gray-600">
-              Découvrez une sélection de nos meilleures offres immobilières
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredProperties.map((property) => (
-              <PropertyCard key={property.id} property={property} />
-            ))}
-          </div>
-
-          <div className="text-center mt-12">
-            <Link
-              to="/search"
-              className="bg-emerald-600 text-white px-8 py-4 rounded-lg font-semibold hover:bg-emerald-700 transition-all duration-300 inline-flex items-center"
-            >
-              Voir tous les biens
-              <ArrowRight className="h-5 w-5 ml-2" />
-            </Link>
-          </div>
-        </div>
-      </section>
+      <FeaturedProperties />
 
       {/* Why Choose Us Section */}
       <section className="py-16 bg-white">
