@@ -243,49 +243,6 @@ Barryland/
 - **Prix transparents** en devise locale
 - **Contact direct** avec les propriétaires
 
-## 🔒 Sécurité et confidentialité
-
-### Authentification
-- **Mots de passe sécurisés** avec validation
-- **Sessions utilisateur** protégées
-- **Validation des données** côté client et serveur
-
-### Protection des données
-- **Conformité RGPD** pour la gestion des données personnelles
-- **Chiffrement** des informations sensibles
-- **Respect de la vie privée** des utilisateurs
-
-## 👨‍💼 Administration
-
-### Tableau de bord admin
-- **Statistiques en temps réel** : utilisateurs, propriétés, activité
-- **Gestion des utilisateurs** : activation/désactivation, vérification
-- **Modération des propriétés** : approbation/rejet des annonces
-- **Logs d'activité** : traçabilité complète des actions
-- **Paramètres système** : configuration de la plateforme
-- **Newsletters** : communication avec les utilisateurs
-
-### Comptes de test créés
-```
-Admin:
-- Email: admin@barryland.gn
-- Mot de passe: AdminBarryLand2025!
-
-Utilisateurs:
-- amadou.barry@example.com (vendeur)
-- fatoumata.diallo@example.com (acheteur)
-- ibrahim.toure@example.com (agent)
-- mariama.camara@example.com (vendeur)
-- alpha.conde@example.com (agent)
-- Mot de passe pour tous: password123
-```
-
-## 🚀 Déploiement
-
-### Environnements recommandés
-- **Frontend** : Vercel, Netlify, Azure Static Web Apps
-- **Backend** : Heroku, DigitalOcean, Railway, AWS
-- **Base de données** : MongoDB Atlas (recommandé)
 
 ### Étapes de déploiement
 
