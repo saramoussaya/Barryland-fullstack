@@ -4,6 +4,8 @@ const User = require('../models/User');
 const Property = require('../models/Property');
 const { AdminLog, SystemStats, SystemSettings } = require('../models/Admin');
 const { auth, authorize } = require('../middleware/auth');
+const HistoryLog = require('../models/HistoryLog');
+const ActivityLog = require('../models/ActivityLog');
 
 const router = express.Router();
 
@@ -234,6 +236,100 @@ router.get('/users', adminAuth, [
       success: false,
       message: 'Erreur lors de la récupération des utilisateurs'
     });
+  }
+});
+
+// @route   GET /api/admin/history
+// @desc    Get history logs (admin only) - supports pagination and filters
+// @access  Private (Admin only)
+router.get('/history', adminAuth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page || '1', 10);
+    const limit = Math.min(parseInt(req.query.limit || '30', 10), 200);
+    const actionType = req.query.actionType;
+    const userEmail = req.query.userEmail;
+    const userId = req.query.userId;
+    const from = req.query.from ? new Date(req.query.from) : null;
+    const to = req.query.to ? new Date(req.query.to) : null;
+
+    const q = {};
+    if (actionType) q.actionType = actionType;
+    if (userEmail) q.userEmail = { $regex: userEmail, $options: 'i' };
+    if (userId) q.userId = userId;
+    if (from || to) {
+      q.timestamp = {};
+      if (from) q.timestamp.$gte = from;
+      if (to) q.timestamp.$lte = to;
+    }
+
+    const skip = (page - 1) * limit;
+    const [items, total] = await Promise.all([
+      HistoryLog.find(q).sort({ timestamp: -1 }).skip(skip).limit(limit).lean(),
+      HistoryLog.countDocuments(q)
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        logs: items,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(total / limit),
+          total,
+          limit
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Erreur fetching admin history:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la récupération des historiques' });
+  }
+});
+
+// @route   GET /api/admin/activity-log
+// @desc    Get activity logs (admin only) - supports pagination and filters
+// @access  Private (Admin only)
+router.get('/activity-log', adminAuth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page || '1', 10);
+    const limit = Math.min(parseInt(req.query.limit || '30', 10), 200);
+    const actionType = req.query.actionType;
+    const userEmail = req.query.userEmail;
+    const userId = req.query.userId;
+    const from = req.query.from ? new Date(req.query.from) : null;
+    const to = req.query.to ? new Date(req.query.to) : null;
+
+    const q = {};
+    if (actionType) q.actionType = actionType;
+    if (userEmail) q.userEmail = { $regex: userEmail, $options: 'i' };
+    if (userId) q.userId = userId;
+    if (from || to) {
+      q.timestamp = {};
+      if (from) q.timestamp.$gte = from;
+      if (to) q.timestamp.$lte = to;
+    }
+
+    const skip = (page - 1) * limit;
+    const [items, total] = await Promise.all([
+      ActivityLog.find(q).sort({ timestamp: -1 }).skip(skip).limit(limit).lean(),
+      ActivityLog.countDocuments(q)
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        logs: items,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(total / limit),
+          total,
+          limit
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Erreur fetching activity log:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la récupération du journal d\'activités' });
   }
 });
 

@@ -2,6 +2,8 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
+const { logHistory } = require('../utils/historyLogger');
+const { logActivity } = require('../utils/activityLogger');
 const { auth } = require('../middleware/auth');
 const { sendEmail } = require('../utils/email');
 
@@ -203,6 +205,29 @@ router.post('/login', loginValidation, async (req, res) => {
       { $set: { lastLogin: new Date() } }
     );
 
+    // Log the successful login (history + activity)
+    try {
+      await logHistory(req, {
+        userId: user._id,
+        userEmail: user.email,
+        actionType: 'LOGIN',
+        actionDetails: { method: 'password' }
+      });
+    } catch (e) { /* ignore */ }
+
+    try {
+      // Use French actionType per ActivityLog enum
+      logActivity(req, {
+        userId: user._id,
+        userEmail: user.email,
+        userRole: user.role,
+        actionType: 'CONNEXION',
+        actionDescription: 'Connexion réussie',
+        targetEntity: 'User',
+        targetId: user._id
+      }).catch(() => {});
+    } catch (e) { /* ignore */ }
+
     // Préparer les données utilisateur
     const userWithFavorites = await User.findById(user._id).populate('favorites');
     const userData = userWithFavorites.getPublicProfile();
@@ -386,6 +411,27 @@ router.put('/change-password', auth, [
 // @desc    Logout user (client-side token removal)
 // @access  Private
 router.post('/logout', auth, (req, res) => {
+  // record logout event asynchronously
+  try {
+    logHistory(req, {
+      userId: req.user?.id || null,
+      userEmail: req.user?.email || null,
+      actionType: 'LOGOUT',
+      actionDetails: {}
+    }).catch(() => {});
+  } catch (e) { /* ignore */ }
+  try {
+    logActivity(req, {
+      userId: req.user?.id || null,
+      userEmail: req.user?.email || null,
+      userRole: req.user?.role || null,
+      actionType: 'DÉCONNEXION',
+      actionDescription: 'Déconnexion utilisateur',
+      targetEntity: 'User',
+      targetId: req.user?.id || null
+    }).catch(() => {});
+  } catch (e) { /* ignore */ }
+
   res.json({
     success: true,
     message: 'Déconnexion réussie'

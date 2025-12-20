@@ -2,9 +2,11 @@ import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate, Routes, Route, Link, useLocation } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
+import AdminLogoutButton from '../components/AdminLogoutButton';
 import AdminProperties from './admin/AdminProperties';
 import UsersPage from './admin/UsersPage';
 const AdminMessages = lazy(() => import('./admin/AdminMessages'));
+const AdminActivityLog = lazy(() => import('./admin/ActivityLog'));
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -47,10 +49,19 @@ const AdminDashboard: React.FC = () => {
                 <Link to="/admin/users" className={`block px-3 py-2 rounded ${location.pathname.includes('/admin/users') ? 'bg-emerald-50 text-emerald-600' : 'text-gray-700'}`}>Utilisateurs</Link>
               </li>
               <li>
+                <Link to="/admin/activity-log" className={`block px-3 py-2 rounded ${location.pathname.includes('/admin/activity-log') ? 'bg-emerald-50 text-emerald-600' : 'text-gray-700'}`}>Historiques</Link>
+              </li>
+              <li>
                 <Link to="/admin/messages" className={`block px-3 py-2 rounded ${location.pathname.includes('/admin/messages') ? 'bg-emerald-50 text-emerald-600' : 'text-gray-700'}`}>Messages</Link>
               </li>
             </ul>
           </nav>
+          {/* Admin logout - visible only for admin users on admin routes */}
+          <div className="p-4">
+            {user && user.role === 'admin' && location.pathname.includes('/admin') && (
+              <AdminLogoutButton />
+            )}
+          </div>
         </aside>
 
         <main className="flex-1 p-8" ref={mainContentRef} tabIndex={-1} aria-live="polite">
@@ -86,6 +97,7 @@ const AdminDashboard: React.FC = () => {
 
               <Route path="properties" element={<AdminProperties />} />
               <Route path="users" element={<UsersPage />} />
+              <Route path="activity-log" element={<Suspense fallback={<div>Chargement...</div>}><AdminActivityLog /></Suspense>} />
               <Route path="messages" element={<Suspense fallback={<div>Chargement...</div>}><AdminMessages /></Suspense>} />
             </Routes>
           </div>

@@ -35,7 +35,7 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     enum: ['particular', 'professional', 'admin'],
-    default: 'professional'
+    default: 'particular'
   },
   isRealEstateAgent: {
     type: Boolean,
