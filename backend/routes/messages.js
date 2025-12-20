@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth, optionalAuth } = require('../middleware/auth');
+const { auth, optionalAuth, authorize } = require('../middleware/auth');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const User = require('../models/User');
@@ -24,18 +24,118 @@ router.get('/conversations', auth, async (req, res) => {
   }
 });
 
-// GET /api/messages/:conversationId - get messages for a conversation
-router.get('/:conversationId', auth, async (req, res) => {
+// GET /api/messages - list messages according to role
+// Admin: all, Professional/owner: messages for their properties, Client: own messages
+router.get('/', auth, async (req, res) => {
   try {
-    const { conversationId } = req.params;
-    const messages = await Message.find({ conversation: conversationId }).sort({ createdAt: 1 }).populate('sender', 'firstName lastName avatar');
-    res.json({ success: true, data: { messages } });
+    const { page = 1, limit = 20, propertyId, status } = req.query;
+    const p = Math.max(1, parseInt(String(page), 10) || 1);
+    const l = Math.max(1, Math.min(200, parseInt(String(limit), 10) || 20));
+
+    const filter = {};
+    if (status) filter.status = status;
+    if (propertyId && String(propertyId).match(/^[0-9a-fA-F]{24}$/)) filter.property = propertyId;
+
+    // Role-based restriction: only admin and owners/professionals may list messages
+    const role = req.user && req.user.role;
+    if (role === 'admin') {
+      // admin can see all
+    } else if (role === 'professional' || role === 'owner') {
+      // find properties owned by this user
+      try {
+        const Property = require('../models/Property');
+        const owned = await Property.find({ owner: req.user.id }).select('_id').lean();
+        const ownedIds = owned.map(o => String(o._id));
+        filter.property = filter.property && ownedIds.includes(String(filter.property)) ? filter.property : { $in: ownedIds };
+      } catch (e) {
+        console.error('Error fetching owned properties for messages:', e);
+        return res.status(500).json({ success: false, message: 'Erreur serveur' });
+      }
+    } else {
+      // other users are not allowed to list messages
+      return res.status(403).json({ success: false, message: 'Accès refusé' });
+    }
+
+    const total = await ContactMessage.countDocuments(filter);
+    const data = await ContactMessage.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((p - 1) * l)
+      .limit(l)
+      .select('firstName lastName email phone property message createdAt status')
+      .populate('property', 'title')
+      .lean();
+
+    return res.json({ success: true, data, total, page: p, limit: l });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Erreur lors de la récupération des messages' });
+    console.error('Error listing contact messages (role):', err);
+    return res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
 
+// ADMIN: list contact messages with filters
+// GET /api/messages/admin
+router.get('/admin', auth, authorize(['admin', 'professional']), async (req, res) => {
+  try {
+    const { propertyId, status, page = 1, limit = 20 } = req.query;
+    const p = Math.max(1, parseInt(String(page), 10) || 1);
+    const l = Math.max(1, Math.min(100, parseInt(String(limit), 10) || 20));
+
+    const filter = {};
+    if (propertyId && String(propertyId).match(/^[0-9a-fA-F]{24}$/)) filter.property = propertyId;
+    if (status) filter.status = status;
+
+    const total = await ContactMessage.countDocuments(filter);
+    const data = await ContactMessage.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((p - 1) * l)
+      .limit(l)
+      .populate('property', 'title')
+      .lean();
+
+    return res.json({ success: true, data, total, page: p, limit: l });
+  } catch (err) {
+    console.error('Error listing contact messages:', err);
+    return res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// ADMIN: get message detail
+// GET /api/messages/admin/:id
+router.get('/admin/:id', auth, authorize(['admin', 'professional']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id || !String(id).match(/^[0-9a-fA-F]{24}$/)) return res.status(400).json({ success: false, message: 'Id invalide' });
+    const msg = await ContactMessage.findById(id).populate('property', 'title').lean();
+    if (!msg) return res.status(404).json({ success: false, message: 'Message non trouvé' });
+    return res.json({ success: true, data: msg });
+  } catch (err) {
+    console.error('Error getting contact message:', err);
+    return res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// ADMIN: update message (status/read)
+// PATCH /api/messages/admin/:id
+router.patch('/admin/:id', auth, authorize(['admin', 'professional']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, read } = req.body;
+    if (!id || !String(id).match(/^[0-9a-fA-F]{24}$/)) return res.status(400).json({ success: false, message: 'Id invalide' });
+    const update = {};
+    if (typeof status === 'string') update.status = status;
+    if (typeof read === 'boolean') update.read = read;
+    if (Object.keys(update).length === 0) return res.status(400).json({ success: false, message: 'Rien à mettre à jour' });
+
+    const updated = await ContactMessage.findByIdAndUpdate(id, update, { new: true }).populate('property', 'title').lean();
+    if (!updated) return res.status(404).json({ success: false, message: 'Message non trouvé' });
+    return res.json({ success: true, data: updated });
+  } catch (err) {
+    console.error('Error updating contact message:', err);
+    return res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/messages/:conversationId - get messages for a conversation
 // Check if current user/email already contacted a property
 // GET /api/messages/contacted/:propertyId?email=optional
 router.get('/contacted/:propertyId', optionalAuth, async (req, res) => {
@@ -63,6 +163,75 @@ router.get('/contacted/:propertyId', optionalAuth, async (req, res) => {
     return res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
+
+// GET /api/messages/:id - detail (role-aware)
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id || !String(id).match(/^[0-9a-fA-F]{24}$/)) return res.status(400).json({ success: false, message: 'Id invalide' });
+    const msg = await ContactMessage.findById(id).select('firstName lastName email phone property message createdAt status').populate('property', 'title owner').lean();
+    if (!msg) return res.status(404).json({ success: false, message: 'Message non trouvé' });
+    const role = req.user && req.user.role;
+    if (role === 'admin') {
+      return res.json({ success: true, data: msg });
+    }
+
+    if ((role === 'professional' || role === 'owner') && msg.property && msg.property.owner) {
+      // allow if owner of the property
+      if (String(msg.property.owner) === String(req.user.id)) return res.json({ success: true, data: msg });
+      return res.status(403).json({ success: false, message: 'Accès refusé' });
+    }
+
+    // other roles (clients) cannot access arbitrary message details
+    return res.status(403).json({ success: false, message: 'Accès refusé' });
+  } catch (err) {
+    console.error('Error getting contact message (role-aware):', err);
+    return res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// PATCH /api/messages/:id - update status/read (role-aware)
+router.patch('/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, read } = req.body;
+    if (!id || !String(id).match(/^[0-9a-fA-F]{24}$/)) return res.status(400).json({ success: false, message: 'Id invalide' });
+    const msg = await ContactMessage.findById(id).populate('property', 'owner').lean();
+    if (!msg) return res.status(404).json({ success: false, message: 'Message non trouvé' });
+
+    const role = req.user && req.user.role;
+    let allowed = false;
+    if (role === 'admin') allowed = true;
+    if ((role === 'professional' || role === 'owner') && msg.property && msg.property.owner && String(msg.property.owner) === String(req.user.id)) allowed = true;
+
+    if (!allowed) return res.status(403).json({ success: false, message: 'Accès refusé' });
+
+    const update = {};
+    if (typeof status === 'string') update.status = status;
+    if (typeof read === 'boolean') update.read = read;
+    if (Object.keys(update).length === 0) return res.status(400).json({ success: false, message: 'Rien à mettre à jour' });
+
+    const updated = await ContactMessage.findByIdAndUpdate(id, update, { new: true }).select('firstName lastName email phone property message createdAt status').populate('property', 'title').lean();
+    return res.json({ success: true, data: updated });
+  } catch (err) {
+    console.error('Error updating contact message (role-aware):', err);
+    return res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/messages/conversations/:conversationId - get messages for a conversation
+router.get('/conversations/:conversationId', auth, async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const messages = await Message.find({ conversation: conversationId }).sort({ createdAt: 1 }).populate('sender', 'firstName lastName avatar');
+    res.json({ success: true, data: { messages } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Erreur lors de la récupération des messages' });
+  }
+});
+
+// (moved contacted route above to avoid param collision)
 
 // Public contact form endpoint
 // POST /api/messages/contact

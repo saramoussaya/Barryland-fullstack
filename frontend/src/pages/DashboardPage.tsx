@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useNotifications } from '../contexts/NotificationContext';
 import NotificationItem from '../components/NotificationItem';
 import { useLocation } from 'react-router-dom';
@@ -7,8 +7,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useProperty } from '../contexts/PropertyContext';
 import PropertyForm from '../components/PropertyForm';
 import PropertyCard from '../components/PropertyCard';
-import MessagesPanel from '../components/MessagesPanel';
 import { useToast } from '../contexts/ToastContext';
+const UserMessages = React.lazy(() => import('./UserMessages'));
 import { useLogout } from '../hooks/useLogout';
 
 // Inline component: ChangePasswordForm
@@ -144,14 +144,24 @@ const DashboardPage: React.FC = () => {
     favorites: favoritesCount
   };
 
-  const tabs = [
+  // Build tabs based on user role: only admins and owners/professionals see Messages
+  const baseTabs: Array<{ id: string; label: string; icon: any }> = [
     { id: 'overview', label: 'Vue d\'ensemble', icon: BarChart3 },
     { id: 'properties', label: 'Mes biens', icon: Home },
     { id: 'favorites', label: 'Favoris', icon: Heart },
-    { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'settings', label: 'Compte', icon: User }
   ];
+
+  const tabs = (() => {
+    const t = [...baseTabs];
+    const role = user?.role as string | undefined;
+    if (role === 'admin' || role === 'professional' || role === 'owner') {
+      // insert Messages tab before Notifications for visibility
+      t.splice(3, 0, { id: 'messages', label: 'Messages', icon: MessageSquare });
+    }
+    return t;
+  })();
 
   // Consider these as account sub-views so the 'Compte' sidebar item stays highlighted
   const accountViews = ['settings', 'profile', 'security'];
@@ -366,15 +376,18 @@ const DashboardPage: React.FC = () => {
           </div>
         );
       case 'messages':
-        return (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Messages</h2>
-              <div className="text-sm text-gray-600 mb-6">Toutes vos conversations avec acheteurs, locataires et agences.</div>
-              <MessagesPanel />
+          return (
+            <div className="space-y-6">
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Messages</h2>
+                <div className="text-sm text-gray-600 mb-6">Gestion de vos messages et demandes reçues.</div>
+                {/* UserMessages: role-aware messages dashboard */}
+                <Suspense fallback={<div className="py-8 text-center">Chargement des messages...</div>}>
+                  <UserMessages />
+                </Suspense>
+              </div>
             </div>
-          </div>
-        );
+          );
       case 'notifications': {
         return (
           <div className="bg-white rounded-lg shadow-md p-6">

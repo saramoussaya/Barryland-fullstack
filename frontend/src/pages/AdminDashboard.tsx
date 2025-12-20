@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate, Routes, Route, Link, useLocation } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
 import AdminProperties from './admin/AdminProperties';
 import UsersPage from './admin/UsersPage';
+const AdminMessages = lazy(() => import('./admin/AdminMessages'));
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -45,6 +46,9 @@ const AdminDashboard: React.FC = () => {
               <li>
                 <Link to="/admin/users" className={`block px-3 py-2 rounded ${location.pathname.includes('/admin/users') ? 'bg-emerald-50 text-emerald-600' : 'text-gray-700'}`}>Utilisateurs</Link>
               </li>
+              <li>
+                <Link to="/admin/messages" className={`block px-3 py-2 rounded ${location.pathname.includes('/admin/messages') ? 'bg-emerald-50 text-emerald-600' : 'text-gray-700'}`}>Messages</Link>
+              </li>
             </ul>
           </nav>
         </aside>
@@ -82,6 +86,7 @@ const AdminDashboard: React.FC = () => {
 
               <Route path="properties" element={<AdminProperties />} />
               <Route path="users" element={<UsersPage />} />
+              <Route path="messages" element={<Suspense fallback={<div>Chargement...</div>}><AdminMessages /></Suspense>} />
             </Routes>
           </div>
         </main>

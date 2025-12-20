@@ -37,7 +37,7 @@ const MessagesPanel: React.FC = () => {
     if (!selected) return;
     const fetchMessages = async () => {
       try {
-        const res = await fetch(`/api/messages/${selected}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
+        const res = await fetch(`/api/messages/conversations/${selected}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
         const data = await res.json();
         if (res.ok) setMessages(data.data.messages || []);
       } catch (err) {
@@ -50,7 +50,7 @@ const MessagesPanel: React.FC = () => {
   const send = async () => {
     if (!selected || !text.trim()) return;
     try {
-      const res = await fetch(`/api/messages/${selected}`, {
+      const res = await fetch(`/api/messages/conversations/${selected}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
         body: JSON.stringify({ body: text.trim() })
