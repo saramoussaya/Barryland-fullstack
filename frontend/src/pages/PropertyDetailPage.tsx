@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   MapPin, Heart, Share2, Camera, Bed, Bath, Square, 
   Calendar, ChevronLeft, ChevronRight, Check, Briefcase, AlertCircle
@@ -7,6 +7,7 @@ import {
 import StatusBadge from '../components/StatusBadge';
 import SimilarProperties from '../components/SimilarProperties';
 import { useProperty } from '../contexts/PropertyContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import apiClient from '../utils/apiClient';
 
@@ -122,17 +123,21 @@ const PropertyDetailPage: React.FC = () => {
   };
 
   // Inline contact form submission handler will be defined in the form onSubmit
-  // On load, check with backend if this user/email already contacted this property
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // On load, check with backend if the LOGGED-IN user already contacted this property.
+  // We intentionally do not mark anonymous visitors as "alreadyContacted" to avoid
+  // greying the form for non-authenticated users.
   useEffect(() => {
     let mounted = true;
     const checkContacted = async () => {
       try {
         const propertyId = property?._id || property?.id || id;
         if (!propertyId) return;
-        // If user previously submitted while logged-out we may have stored their email locally
-        const storedEmail = localStorage.getItem(`contacted:${propertyId}`) || undefined;
-        const query = storedEmail ? `?email=${encodeURIComponent(storedEmail)}` : '';
-        const resp = await apiClient.get(`/messages/contacted/${propertyId}${query}`);
+        // Only check for authenticated users
+        if (!user) return;
+        const resp = await apiClient.get(`/messages/contacted/${propertyId}`);
         if (!mounted) return;
         if (resp && resp.data && resp.data.alreadyContacted) {
           setAlreadyContacted(true);
@@ -144,7 +149,7 @@ const PropertyDetailPage: React.FC = () => {
     };
     checkContacted();
     return () => { mounted = false; };
-  }, [id, property]);
+  }, [id, property, user]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -463,8 +468,8 @@ const PropertyDetailPage: React.FC = () => {
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    disabled={sent || alreadyContacted}
-                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.firstName ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500 ${(sent || alreadyContacted) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    disabled={sent || (alreadyContacted && Boolean(user))}
+                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.firstName ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500 ${(sent || (alreadyContacted && Boolean(user))) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="Prénom"
                   />
                   {formErrors.firstName && <p className="text-red-500 text-sm mt-1">{formErrors.firstName}</p>}
@@ -476,8 +481,8 @@ const PropertyDetailPage: React.FC = () => {
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    disabled={sent || alreadyContacted}
-                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.lastName ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500 ${(sent || alreadyContacted) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    disabled={sent || (alreadyContacted && Boolean(user))}
+                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.lastName ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500 ${(sent || (alreadyContacted && Boolean(user))) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="Nom de famille"
                   />
                   {formErrors.lastName && <p className="text-red-500 text-sm mt-1">{formErrors.lastName}</p>}
@@ -489,8 +494,8 @@ const PropertyDetailPage: React.FC = () => {
                     type="email"
                     value={contactEmail}
                     onChange={(e) => setContactEmail(e.target.value)}
-                    disabled={sent || alreadyContacted}
-                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.email ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500 ${(sent || alreadyContacted) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    disabled={sent || (alreadyContacted && Boolean(user))}
+                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.email ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500 ${(sent || (alreadyContacted && Boolean(user))) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="Email"
                   />
                   {formErrors.email && <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>}
@@ -502,8 +507,8 @@ const PropertyDetailPage: React.FC = () => {
                     type="tel"
                     value={contactPhone}
                     onChange={(e) => setContactPhone(e.target.value)}
-                    disabled={sent || alreadyContacted}
-                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.phone ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500 ${(sent || alreadyContacted) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    disabled={sent || (alreadyContacted && Boolean(user))}
+                    className={`w-full px-3 py-2 rounded-lg border ${formErrors.phone ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-emerald-500 ${(sent || (alreadyContacted && Boolean(user))) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="Téléphone"
                   />
                   {formErrors.phone && <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>}
@@ -518,16 +523,24 @@ const PropertyDetailPage: React.FC = () => {
                 {showMessage && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                    <textarea rows={4} value={message} disabled={sent || alreadyContacted} onChange={(e) => setMessage(e.target.value)} className={`w-full border ${formErrors.message ? 'border-red-500' : 'border-gray-300'} rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 ${(sent || alreadyContacted) ? 'bg-gray-100 cursor-not-allowed' : ''}`} />
+                    <textarea rows={4} value={message} disabled={sent || (alreadyContacted && Boolean(user))} onChange={(e) => setMessage(e.target.value)} className={`w-full border ${formErrors.message ? 'border-red-500' : 'border-gray-300'} rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 ${(sent || (alreadyContacted && Boolean(user))) ? 'bg-gray-100 cursor-not-allowed' : ''}`} />
                     {formErrors.message && <p className="text-red-500 text-sm mt-1">{formErrors.message}</p>}
                   </div>
                 )}
 
                 <div>
-                  {alreadyContacted ? (
-                    <div className="w-full bg-gray-100 text-gray-700 py-3 rounded-full text-center font-medium">Vous avez déjà contacté l'agence pour ce bien. Un conseiller vous recontactera prochainement.</div>
-                  ) : sent ? (
+                  {sent ? (
                     <div className="w-full bg-gray-100 text-gray-700 py-3 rounded-full text-center font-medium">Votre message a été envoyé avec succès ! Notre équipe vous contactera rapidement.</div>
+                  ) : alreadyContacted && user ? (
+                    <div className="w-full bg-gray-100 text-gray-700 py-3 rounded-full text-center font-medium">Vous avez déjà contacté l'agence pour ce bien. Un conseiller vous recontactera prochainement.</div>
+                  ) : !user ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/auth')}
+                      className="w-full bg-emerald-600 text-white py-3 rounded-full font-semibold hover:bg-emerald-700 transition-colors"
+                    >
+                      Se connecter pour contacter
+                    </button>
                   ) : (
                     <button type="submit" disabled={sending} className={`w-full bg-red-600 text-white py-3 rounded-full font-semibold hover:bg-red-700 transition-colors ${sending ? 'opacity-80 cursor-wait' : ''}`}>
                       {sending ? 'Envoi en cours...' : 'Contacter l\'agence'}

@@ -128,11 +128,6 @@ EMAIL_PORT=587
 EMAIL_USER=votre_email@gmail.com
 EMAIL_PASS=votre_mot_de_passe_app
 
-# Admin par défaut
-ADMIN_EMAIL=admin@barryland.gn
-ADMIN_PASSWORD=AdminBarryLand2025!
-ADMIN_NAME=Administrateur BarryLand
-```
 
 6. **Démarrer MongoDB**
 ```bash
