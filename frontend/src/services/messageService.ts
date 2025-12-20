@@ -31,4 +31,9 @@ export const updateMessage = async (id: string, data: { status?: string; read?: 
   return resp.data;
 };
 
-export default { getMessages, getMessage, updateMessage };
+export const createMessage = async (data: { firstName?: string; lastName?: string; email?: string; phone?: string; propertyId?: string; property?: string; message: string }) => {
+  const resp = await apiClient.post('/messages', data);
+  return resp.data;
+};
+
+export default { getMessages, getMessage, updateMessage, createMessage };

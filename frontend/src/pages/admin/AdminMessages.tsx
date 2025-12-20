@@ -69,6 +69,7 @@ const AdminMessages: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<MessageItem | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterProperty, setFilterProperty] = useState<string>('');
 
@@ -78,8 +79,10 @@ const AdminMessages: React.FC = () => {
       const resp = await messageService.getMessages({ page, limit, propertyId: filterProperty || undefined, status: filterStatus || undefined });
       setMessages(resp.data || []);
       setTotal(resp.total || 0);
+      setAccessDenied(false);
     } catch (err) {
       console.error('Erreur chargement messages', err);
+      if ((err as any)?.response?.status === 403) setAccessDenied(true);
     } finally {
       setLoading(false);
     }
@@ -93,6 +96,7 @@ const AdminMessages: React.FC = () => {
       setSelected(resp.data || m);
     } catch (err) {
       console.error('Erreur détail message', err);
+      if ((err as any)?.response?.status === 403) setAccessDenied(true);
     }
   };
 
@@ -122,7 +126,9 @@ const AdminMessages: React.FC = () => {
       </div>
 
       <div className="space-y-4">
-        {loading ? (
+        {accessDenied ? (
+          <div className="py-8 text-center text-red-600">Accès refusé — vous n'êtes pas autorisé à voir ces messages.</div>
+        ) : loading ? (
           <div className="py-8 text-center">Chargement...</div>
         ) : messages.length === 0 ? (
           <div className="py-8 text-center text-gray-500">Aucun message</div>

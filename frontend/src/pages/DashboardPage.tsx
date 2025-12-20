@@ -9,6 +9,7 @@ import PropertyForm from '../components/PropertyForm';
 import PropertyCard from '../components/PropertyCard';
 import { useToast } from '../contexts/ToastContext';
 const UserMessages = React.lazy(() => import('./UserMessages'));
+const AdminMessages = React.lazy(() => import('./admin/AdminMessages'));
 import { useLogout } from '../hooks/useLogout';
 
 // Inline component: ChangePasswordForm
@@ -383,7 +384,7 @@ const DashboardPage: React.FC = () => {
                 <div className="text-sm text-gray-600 mb-6">Gestion de vos messages et demandes reçues.</div>
                 {/* UserMessages: role-aware messages dashboard */}
                 <Suspense fallback={<div className="py-8 text-center">Chargement des messages...</div>}>
-                  <UserMessages />
+                  {user?.role === 'admin' ? <AdminMessages /> : <UserMessages />}
                 </Suspense>
               </div>
             </div>

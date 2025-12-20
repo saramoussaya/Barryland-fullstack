@@ -36,24 +36,25 @@ router.get('/', auth, async (req, res) => {
     if (status) filter.status = status;
     if (propertyId && String(propertyId).match(/^[0-9a-fA-F]{24}$/)) filter.property = propertyId;
 
-    // Role-based restriction: only admin and owners/professionals may list messages
+    // Role-agnostic owner check: admin sees all; otherwise only messages for properties owned by the current user
     const role = req.user && req.user.role;
     if (role === 'admin') {
       // admin can see all
-    } else if (role === 'professional' || role === 'owner') {
-      // find properties owned by this user
+    } else {
+      // find properties owned by this user (ownerId match) regardless of user role
       try {
         const Property = require('../models/Property');
         const owned = await Property.find({ owner: req.user.id }).select('_id').lean();
         const ownedIds = owned.map(o => String(o._id));
+        if (!ownedIds.length) {
+          // user does not own any property -> deny access
+          return res.status(403).json({ success: false, message: 'Accès refusé' });
+        }
         filter.property = filter.property && ownedIds.includes(String(filter.property)) ? filter.property : { $in: ownedIds };
       } catch (e) {
         console.error('Error fetching owned properties for messages:', e);
         return res.status(500).json({ success: false, message: 'Erreur serveur' });
       }
-    } else {
-      // other users are not allowed to list messages
-      return res.status(403).json({ success: false, message: 'Accès refusé' });
     }
 
     const total = await ContactMessage.countDocuments(filter);
@@ -176,13 +177,11 @@ router.get('/:id', auth, async (req, res) => {
       return res.json({ success: true, data: msg });
     }
 
-    if ((role === 'professional' || role === 'owner') && msg.property && msg.property.owner) {
-      // allow if owner of the property
-      if (String(msg.property.owner) === String(req.user.id)) return res.json({ success: true, data: msg });
-      return res.status(403).json({ success: false, message: 'Accès refusé' });
+    // For non-admin users allow only if they are the owner of the property (ownerId match)
+    if (msg.property && msg.property.owner && String(msg.property.owner) === String(req.user.id)) {
+      return res.json({ success: true, data: msg });
     }
 
-    // other roles (clients) cannot access arbitrary message details
     return res.status(403).json({ success: false, message: 'Accès refusé' });
   } catch (err) {
     console.error('Error getting contact message (role-aware):', err);
@@ -202,7 +201,8 @@ router.patch('/:id', auth, async (req, res) => {
     const role = req.user && req.user.role;
     let allowed = false;
     if (role === 'admin') allowed = true;
-    if ((role === 'professional' || role === 'owner') && msg.property && msg.property.owner && String(msg.property.owner) === String(req.user.id)) allowed = true;
+    // owner of the property may update regardless of declared role
+    if (msg.property && msg.property.owner && String(msg.property.owner) === String(req.user.id)) allowed = true;
 
     if (!allowed) return res.status(403).json({ success: false, message: 'Accès refusé' });
 
@@ -308,6 +308,43 @@ router.post('/contact', optionalAuth, async (req, res) => {
   } catch (err) {
     console.error('Error saving contact message:', err);
     res.status(500).json({ success: false, message: 'Erreur lors de l\'enregistrement du message' });
+  }
+});
+
+// POST /api/messages - create a contact message linked to a property
+router.post('/', optionalAuth, async (req, res) => {
+  try {
+    const bodyData = req.body || {};
+    const messageFromMessageKey = typeof bodyData.message === 'string' ? bodyData.message : undefined;
+    const altMessage = (bodyData.body || bodyData.msg);
+    const message = (messageFromMessageKey !== undefined ? messageFromMessageKey : altMessage || '').toString().trim();
+
+    if (!message || message.length === 0) {
+      return res.status(400).json({ success: false, message: 'Message vide' });
+    }
+
+    const firstName = bodyData.firstName || bodyData.firstname || undefined;
+    const lastName = bodyData.lastName || bodyData.lastname || undefined;
+    const email = bodyData.email || undefined;
+    const phone = bodyData.phone || undefined;
+    const propertyId = bodyData.propertyId || bodyData.property || bodyData.property_id;
+
+    const contact = await ContactMessage.create({
+      user: req.user && req.user.id ? req.user.id : undefined,
+      firstName: firstName ? String(firstName).trim() : undefined,
+      lastName: lastName ? String(lastName).trim() : undefined,
+      email: email ? String(email).trim().toLowerCase() : undefined,
+      phone: phone ? String(phone).trim() : undefined,
+      property: propertyId && String(propertyId).match(/^[0-9a-fA-F]{24}$/) ? propertyId : undefined,
+      message: message
+    });
+
+    const populated = await ContactMessage.findById(contact._id).select('firstName lastName email phone property message createdAt status').populate('property', 'title').lean();
+
+    return res.status(201).json({ success: true, data: populated });
+  } catch (err) {
+    console.error('Error creating contact message:', err);
+    return res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
 

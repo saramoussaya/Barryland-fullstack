@@ -102,7 +102,7 @@ router.post('/register', registerValidation, async (req, res) => {
       lastName: user.lastName,
       email: user.email,
       phone: user.phone,
-      role: user.role || 'user'
+      role: user.role || 'professional'
     };
 
     // Send welcome email
@@ -112,7 +112,7 @@ router.post('/register', registerValidation, async (req, res) => {
         template: 'welcome',
         data: {
           userName: `${user.firstName} ${user.lastName}`,
-          userType: user.role || 'user'
+          userType: user.role || 'professional'
         }
       });
     } catch (emailError) {
