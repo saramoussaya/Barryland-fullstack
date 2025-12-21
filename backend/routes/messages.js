@@ -6,6 +6,8 @@ const Message = require('../models/Message');
 const User = require('../models/User');
 const ContactMessage = require('../models/ContactMessage');
 const { sendEmail } = require('../utils/email');
+const { logHistory } = require('../utils/historyLogger');
+const { logActivity } = require('../utils/activityLogger');
 
 // GET /api/messages/conversations - list user's conversations
 router.get('/conversations', auth, async (req, res) => {
@@ -304,6 +306,29 @@ router.post('/contact', optionalAuth, async (req, res) => {
     }
 
     // Respond with minimal success payload as requested
+    try {
+      await logHistory(req, {
+        userId: contact.user || null,
+        userEmail: contact.email || null,
+        actionType: 'ENVOI_MESSAGE',
+        actionDetails: { contactId: contact._id, property: contact.property }
+      });
+    } catch (e) { /* ignore */ }
+
+    if (contact.user) {
+      try {
+        logActivity(req, {
+          userId: contact.user,
+          userEmail: contact.email || null,
+          userRole: req.user?.role || null,
+          actionType: 'ENVOI_MESSAGE',
+          actionDescription: 'Contact via formulaire',
+          targetEntity: 'ContactMessage',
+          targetId: contact._id
+        }).catch(() => {});
+      } catch (e) { /* ignore */ }
+    }
+
     return res.status(201).json({ success: true });
   } catch (err) {
     console.error('Error saving contact message:', err);
@@ -340,6 +365,28 @@ router.post('/', optionalAuth, async (req, res) => {
     });
 
     const populated = await ContactMessage.findById(contact._id).select('firstName lastName email phone property message createdAt status').populate('property', 'title').lean();
+    try {
+      await logHistory(req, {
+        userId: contact.user || null,
+        userEmail: contact.email || null,
+        actionType: 'ENVOI_MESSAGE',
+        actionDetails: { contactId: contact._id, property: contact.property }
+      });
+    } catch (e) { /* ignore */ }
+
+    if (contact.user) {
+      try {
+        logActivity(req, {
+          userId: contact.user,
+          userEmail: contact.email || null,
+          userRole: req.user?.role || null,
+          actionType: 'ENVOI_MESSAGE',
+          actionDescription: 'Contact vers propriétaire',
+          targetEntity: 'ContactMessage',
+          targetId: contact._id
+        }).catch(() => {});
+      } catch (e) { /* ignore */ }
+    }
 
     return res.status(201).json({ success: true, data: populated });
   } catch (err) {
@@ -362,6 +409,29 @@ router.post('/:conversationId', auth, async (req, res) => {
     await Conversation.findByIdAndUpdate(conversationId, { lastMessage: body, updatedAt: new Date() });
 
     const populated = await msg.populate('sender', 'firstName lastName avatar');
+
+    // Log message sent
+    try {
+      await logHistory(req, {
+        userId: req.user.id,
+        userEmail: req.user.email || null,
+        actionType: 'ENVOI_MESSAGE',
+        actionDetails: { conversationId, messageId: msg._id }
+      });
+    } catch (e) { /* ignore */ }
+
+    try {
+      logActivity(req, {
+        userId: req.user.id,
+        userEmail: req.user.email || null,
+        userRole: req.user.role || null,
+        actionType: 'ENVOI_MESSAGE',
+        actionDescription: 'Envoi d\'un message',
+        targetEntity: 'Conversation',
+        targetId: conversationId
+      }).catch(() => {});
+    } catch (e) { /* ignore */ }
+
     res.status(201).json({ success: true, data: { message: populated } });
   } catch (err) {
     console.error(err);

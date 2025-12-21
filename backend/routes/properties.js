@@ -3,6 +3,8 @@ const { body, query, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const User = require('../models/User');
+const { logHistory } = require('../utils/historyLogger');
+const { logActivity } = require('../utils/activityLogger');
 const { auth, authorize } = require('../middleware/auth');
 // middleware/upload exports the multer instance directly (module.exports = upload)
 // Require it as a value rather than destructuring to avoid undefined
@@ -502,6 +504,28 @@ router.post('/', auth, propertyValidation, async (req, res) => {
       console.warn('Notification not created:', notifErr.message || notifErr);
     }
 
+    // Log property creation
+    try {
+      await logHistory(req, {
+        userId: req.user.id,
+        userEmail: req.user.email,
+        actionType: 'PUBLICATION_ANNONCE',
+        actionDetails: { propertyId: property._id, title: property.title }
+      });
+    } catch (e) { /* ignore */ }
+
+    try {
+      logActivity(req, {
+        userId: req.user.id,
+        userEmail: req.user.email,
+        userRole: req.user.role,
+        actionType: 'PUBLICATION_ANNONCE',
+        actionDescription: 'Création d\'une annonce',
+        targetEntity: 'Property',
+        targetId: property._id
+      }).catch(() => {});
+    } catch (e) { /* ignore */ }
+
     res.status(201).json({
       success: true,
       message: 'Propriété créée avec succès. Elle sera visible après validation.',
@@ -598,6 +622,28 @@ router.put('/:id', auth, propertyValidation, async (req, res) => {
     await property.save();
     await property.populate('owner', 'name email phone avatar');
 
+    // Log property update
+    try {
+      await logHistory(req, {
+        userId: req.user.id,
+        userEmail: req.user.email,
+        actionType: 'MODIFICATION_ANNONCE',
+        actionDetails: { propertyId: property._id, updatedFields: Object.keys(updateData) }
+      });
+    } catch (e) { /* ignore */ }
+
+    try {
+      logActivity(req, {
+        userId: req.user.id,
+        userEmail: req.user.email,
+        userRole: req.user.role,
+        actionType: 'MODIFICATION_ANNONCE',
+        actionDescription: 'Modification d\'une annonce',
+        targetEntity: 'Property',
+        targetId: property._id
+      }).catch(() => {});
+    } catch (e) { /* ignore */ }
+
     res.json({
       success: true,
       message: 'Propriété mise à jour avec succès',
@@ -678,6 +724,28 @@ router.delete('/:id', auth, async (req, res) => {
     }
 
     await Property.findByIdAndDelete(req.params.id);
+
+    // Log property deletion
+    try {
+      await logHistory(req, {
+        userId: req.user.id,
+        userEmail: req.user.email,
+        actionType: 'SUPPRESSION_ANNONCE',
+        actionDetails: { propertyId: req.params.id, title: property.title }
+      });
+    } catch (e) { /* ignore */ }
+
+    try {
+      logActivity(req, {
+        userId: req.user.id,
+        userEmail: req.user.email,
+        userRole: req.user.role,
+        actionType: 'SUPPRESSION_ANNONCE',
+        actionDescription: 'Suppression d\'une annonce',
+        targetEntity: 'Property',
+        targetId: req.params.id
+      }).catch(() => {});
+    } catch (e) { /* ignore */ }
 
     res.json({
       success: true,
@@ -789,6 +857,28 @@ router.post('/:id/favorite', auth, async (req, res) => {
     if (!freshProperty) {
       return res.status(404).json({ success: false, message: 'Propriété introuvable après mise à jour' });
     }
+
+    // Log favorite action
+    try {
+      await logHistory(req, {
+        userId,
+        userEmail: user.email,
+        actionType: hasFav ? 'RETRAIT_FAVORIS' : 'AJOUT_FAVORIS',
+        actionDetails: { propertyId: workingId }
+      });
+    } catch (e) { /* ignore */ }
+
+    try {
+      logActivity(req, {
+        userId,
+        userEmail: user.email,
+        userRole: user.role,
+        actionType: 'AJOUT_FAVORIS',
+        actionDescription: hasFav ? 'Retiré des favoris' : 'Ajouté aux favoris',
+        targetEntity: 'Property',
+        targetId: workingId
+      }).catch(() => {});
+    } catch (e) { /* ignore */ }
 
     // Ensure favorites count is not negative
     if (typeof freshProperty.favorites !== 'number' || freshProperty.favorites < 0) {

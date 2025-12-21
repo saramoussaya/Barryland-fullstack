@@ -121,6 +121,28 @@ router.post('/register', registerValidation, async (req, res) => {
       console.error('Erreur envoi email de bienvenue:', emailError);
     }
 
+    // Log registration into history and activity logs
+    try {
+      await logHistory(req, {
+        userId: user._id,
+        userEmail: user.email,
+        actionType: 'INSCRIPTION',
+        actionDetails: { method: 'register' }
+      });
+    } catch (e) { /* ignore */ }
+
+    try {
+      logActivity(req, {
+        userId: user._id,
+        userEmail: user.email,
+        userRole: user.role,
+        actionType: 'INSCRIPTION',
+        actionDescription: 'Nouvelle inscription',
+        targetEntity: 'User',
+        targetId: user._id
+      }).catch(() => {});
+    } catch (e) { /* ignore */ }
+
     res.status(201).json({
       success: true,
       message: 'Compte créé avec succès',
@@ -331,6 +353,28 @@ router.put('/profile', auth, [
 
     Object.assign(user, updates);
     await user.save();
+
+    // Log profile update
+    try {
+      await logHistory(req, {
+        userId: req.user.id,
+        userEmail: user.email,
+        actionType: 'MODIFICATION_PROFIL',
+        actionDetails: { updatedFields: Object.keys(updates) }
+      });
+    } catch (e) { /* ignore */ }
+
+    try {
+      logActivity(req, {
+        userId: req.user.id,
+        userEmail: user.email,
+        userRole: user.role,
+        actionType: 'MODIFICATION_PROFIL',
+        actionDescription: 'Mise à jour du profil',
+        targetEntity: 'User',
+        targetId: user._id
+      }).catch(() => {});
+    } catch (e) { /* ignore */ }
 
     res.json({
       success: true,

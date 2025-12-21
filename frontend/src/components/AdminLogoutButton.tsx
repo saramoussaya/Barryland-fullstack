@@ -16,7 +16,8 @@ const AdminLogoutButton: React.FC = () => {
   const handleConfirm = async () => {
     setLoading(true);
     try {
-      await apiClient.post('/admin/logout', {}, { headers: { 'X-Skip-Auth-Redirect': '1' } } as any);
+      // call auth logout endpoint to record server-side logs
+      await apiClient.post('/auth/logout', {}, { headers: { 'X-Skip-Auth-Redirect': '1' } } as any);
     } catch (err) {
       // ignore server errors
       // eslint-disable-next-line no-console

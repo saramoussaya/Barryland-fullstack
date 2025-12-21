@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Navigate, Routes, Route, Link, useLocation } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
 import AdminLogoutButton from '../components/AdminLogoutButton';
+import { BarChart2, Home, Users, Clock, MessageSquare } from 'lucide-react';
 import AdminProperties from './admin/AdminProperties';
 import UsersPage from './admin/UsersPage';
 const AdminMessages = lazy(() => import('./admin/AdminMessages'));
@@ -33,31 +34,81 @@ const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="flex">
-        <aside className="w-64 bg-white shadow-md min-h-screen">
-          <div className="p-4 bg-emerald-600">
-            <h2 className="text-white text-lg font-semibold">Admin Dashboard</h2>
+        <aside className="hidden md:flex flex-col w-72 bg-gradient-to-b from-emerald-900 to-emerald-700 text-white shadow-md min-h-screen">
+          <div className="p-4 border-b border-emerald-800">
+            <div className="flex items-center space-x-3">
+              <div className="bg-white/10 p-2 rounded-md">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 11L12 3l9 8v8a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8z" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-white text-lg font-semibold">BarryLand</div>
+                <div className="text-xs text-gray-400">Espace Administrateur</div>
+              </div>
+            </div>
           </div>
-          <nav className="mt-4 p-4">
+
+          <nav className="p-4 overflow-auto flex-1">
             <ul className="space-y-2">
+              {/* Statistiques */}
               <li>
-                <Link to="/admin" className={`block px-3 py-2 rounded ${location.pathname === '/admin' ? 'bg-emerald-50 text-emerald-600' : 'text-gray-700'}`}>Statistiques</Link>
+                <Link to="/admin" className={`flex items-center justify-between px-4 py-3 my-1 rounded-lg transition-all duration-200 ${location.pathname === '/admin' ? 'bg-blue-600 text-white shadow-md border-l-4 border-white/20 scale-105' : 'text-gray-300 hover:bg-gray-700/50 hover:text-white'}`}>
+                  <div className="flex items-center space-x-3">
+                    <span className="p-2 rounded-md bg-white/5"><BarChart2 className="w-5 h-5" /></span>
+                    <span className="font-medium">Tableau de bord</span>
+                  </div>
+                  {/* Badge supprimé - affichage numérique désactivé */}
+                </Link>
               </li>
+
+              {/* Annonces */}
               <li>
-                <Link to="/admin/properties" className={`block px-3 py-2 rounded ${location.pathname.includes('/admin/properties') ? 'bg-emerald-50 text-emerald-600' : 'text-gray-700'}`}>Annonces</Link>
+                <Link to="/admin/properties" className={`flex items-center justify-between px-4 py-3 my-1 rounded-lg transition-all duration-200 ${location.pathname.includes('/admin/properties') ? 'bg-green-600 text-white shadow-md border-l-4 border-white/20 scale-105' : 'text-gray-300 hover:bg-gray-700/50 hover:text-white'}`}>
+                  <div className="flex items-center space-x-3">
+                    <span className="p-2 rounded-md bg-white/5"><Home className="w-5 h-5" /></span>
+                    <span className="font-medium">Gestion des annonces</span>
+                  </div>
+                  {/* Badge supprimé - affichage numérique désactivé */}
+                </Link>
               </li>
+
+              {/* Utilisateurs */}
               <li>
-                <Link to="/admin/users" className={`block px-3 py-2 rounded ${location.pathname.includes('/admin/users') ? 'bg-emerald-50 text-emerald-600' : 'text-gray-700'}`}>Utilisateurs</Link>
+                <Link to="/admin/users" className={`flex items-center justify-between px-4 py-3 my-1 rounded-lg transition-all duration-200 ${location.pathname.includes('/admin/users') ? 'bg-purple-600 text-white shadow-md border-l-4 border-white/20 scale-105' : 'text-gray-300 hover:bg-gray-700/50 hover:text-white'}`}>
+                  <div className="flex items-center space-x-3">
+                    <span className="p-2 rounded-md bg-white/5"><Users className="w-5 h-5" /></span>
+                    <span className="font-medium">Utilisateurs</span>
+                  </div>
+                  {/* Badge supprimé - affichage numérique désactivé */}
+                </Link>
               </li>
+
+              {/* Historiques */}
               <li>
-                <Link to="/admin/activity-log" className={`block px-3 py-2 rounded ${location.pathname.includes('/admin/activity-log') ? 'bg-emerald-50 text-emerald-600' : 'text-gray-700'}`}>Historiques</Link>
+                <Link to="/admin/activity-log" className={`flex items-center justify-between px-4 py-3 my-1 rounded-lg transition-all duration-200 ${location.pathname.includes('/admin/activity-log') ? 'bg-amber-500 text-white shadow-md border-l-4 border-white/20 scale-105' : 'text-gray-300 hover:bg-gray-700/50 hover:text-white'}`}>
+                  <div className="flex items-center space-x-3">
+                    <span className="p-2 rounded-md bg-white/5"><Clock className="w-5 h-5" /></span>
+                    <span className="font-medium">Journal d'activités</span>
+                  </div>
+                </Link>
               </li>
+
+              {/* Messages */}
               <li>
-                <Link to="/admin/messages" className={`block px-3 py-2 rounded ${location.pathname.includes('/admin/messages') ? 'bg-emerald-50 text-emerald-600' : 'text-gray-700'}`}>Messages</Link>
+                <Link to="/admin/messages" className={`flex items-center justify-between px-4 py-3 my-1 rounded-lg transition-all duration-200 ${location.pathname.includes('/admin/messages') ? 'bg-cyan-500 text-white shadow-md border-l-4 border-white/20 scale-105' : 'text-gray-300 hover:bg-gray-700/50 hover:text-white'}`}>
+                  <div className="flex items-center space-x-3">
+                    <span className="p-2 rounded-md bg-white/5"><MessageSquare className="w-5 h-5" /></span>
+                    <span className="font-medium">Messages</span>
+                  </div>
+                  {/* unread count not yet available in overview */}
+                  {/* Badge supprimé - affichage numérique désactivé */}
+                </Link>
               </li>
             </ul>
           </nav>
-          {/* Admin logout - visible only for admin users on admin routes */}
-          <div className="p-4">
+
+          <div className="p-4 border-t border-emerald-800">
             {user && user.role === 'admin' && location.pathname.includes('/admin') && (
               <AdminLogoutButton />
             )}

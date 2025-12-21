@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import messageService from '../services/messageService';
+import { Link } from 'react-router-dom';
 
 type PropertyRef = { _id?: string; title?: string } | string | null;
 
@@ -32,6 +33,11 @@ const StatusBadge: React.FC<{ status: Msg['status'] }> = ({ status }) => {
 const MessageCard: React.FC<{ m: Msg; onOpen: (m: Msg) => void }> = ({ m, onOpen }) => {
   const unread = m.status === 'nouveau';
   const propertyTitle = typeof m.property === 'string' ? m.property : m.property?.title || '';
+  const propertyId = ((): string | null => {
+    if (!m.property) return null;
+    if (typeof m.property === 'string') return /^[0-9a-fA-F]{24}$/.test(m.property) ? m.property : null;
+    return m.property._id ? String(m.property._id) : null;
+  })();
   return (
     <article
       onClick={() => onOpen(m)}
@@ -47,7 +53,15 @@ const MessageCard: React.FC<{ m: Msg; onOpen: (m: Msg) => void }> = ({ m, onOpen
           </div>
 
           <div className="mt-3">
-            <div className="text-sm font-medium text-slate-800 truncate">{propertyTitle}</div>
+            <div className="text-sm font-medium text-slate-800 truncate">
+              {propertyId ? (
+                <Link to={`/property/${propertyId}`} onClick={(e) => e.stopPropagation()} className="text-emerald-600 hover:underline">
+                  {propertyTitle}
+                </Link>
+              ) : (
+                <span>{propertyTitle}</span>
+              )}
+            </div>
             <p className="mt-2 text-sm text-slate-700 leading-relaxed max-w-full break-words">{m.message}</p>
           </div>
         </div>
@@ -163,8 +177,13 @@ const UserMessages: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-3">
-              <div className="text-sm text-gray-600">Bien: {typeof selected.property === 'string' ? selected.property : selected.property?.title || ''}</div>
+              <div className="mt-4 grid grid-cols-1 gap-3">
+              <div className="text-sm text-gray-600">Bien: {(() => {
+                const prop = selected.property;
+                const title = typeof prop === 'string' ? prop : prop?.title || '';
+                const id = (prop && typeof prop === 'string') ? (/^[0-9a-fA-F]{24}$/.test(prop) ? prop : null) : (prop?._id ? String(prop._id) : null);
+                return id ? <Link to={`/property/${id}`} className="text-emerald-600 hover:underline">{title}</Link> : <span>{title}</span>;
+              })()}</div>
               <div className="text-sm text-gray-600">Date: {selected.createdAt ? new Date(selected.createdAt).toLocaleString() : ''}</div>
               <div className="mt-3 p-4 bg-gray-50 rounded text-sm whitespace-pre-wrap">{selected.message}</div>
             </div>

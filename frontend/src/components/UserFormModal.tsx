@@ -10,10 +10,11 @@ type User = {
   phone: string;
   role?: string;
   isActive?: boolean;
+  password?: string;
 };
 
 const UserFormModal: React.FC<{ initialUser?: User | null; onClose: () => void }> = ({ initialUser = null, onClose }) => {
-  const [form, setForm] = useState<User>({ firstName: '', lastName: '', email: '', phone: '', role: 'particular', isActive: true });
+  const [form, setForm] = useState<User>({ firstName: '', lastName: '', email: '', phone: '', role: 'particular', isActive: true, password: '' });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const toast = useToast();
@@ -28,6 +29,11 @@ const UserFormModal: React.FC<{ initialUser?: User | null; onClose: () => void }
     if (!form.lastName || form.lastName.trim().length < 2) e.lastName = 'Nom trop court';
     if (!form.email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email)) e.email = 'Email invalide';
     if (!form.phone || !/^\+224[0-9]{8,9}$/.test(form.phone)) e.phone = 'Téléphone invalide (+224...)';
+    if (!initialUser) {
+      if (!('password' in form) || !form.password || (form.password && form.password.length < 6)) e.password = 'Mot de passe requis (6 caractères mini)';
+    } else {
+      if (form.password && form.password.length > 0 && form.password.length < 6) e.password = 'Mot de passe trop court (6 caractères mini)';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -43,12 +49,31 @@ const UserFormModal: React.FC<{ initialUser?: User | null; onClose: () => void }
     setSaving(true);
     try {
       if (initialUser && initialUser._id) {
-        const res = await apiClient.put(`/admin/users/${initialUser._id}`, form);
-        if (res.data.success) {
+        // Do not send role through this endpoint (backend forbids it)
+        const payload: any = { ...form };
+        if (payload.role) delete payload.role;
+        // Also avoid sending empty password
+        if (!payload.password) delete payload.password;
+
+        const res = await apiClient.put(`/admin/users/${initialUser._id}`, payload);
+        if (!res.data.success) {
+          toast.showToast(res.data.message || 'Erreur', 'error');
+        } else {
+          // If role changed, call dedicated role endpoint
+          if (form.role && form.role !== initialUser.role) {
+            try {
+              const roleRes = await apiClient.put(`/admin/users/${initialUser._id}/role`, { role: form.role });
+              if (!roleRes.data.success) {
+                toast.showToast(roleRes.data.message || 'Erreur lors du changement de rôle', 'error');
+              }
+            } catch (roleErr: any) {
+              console.error('role change error', roleErr);
+              toast.showToast('Erreur lors du changement de rôle', 'error');
+            }
+          }
+
           toast.showToast('Utilisateur mis à jour', 'success');
           onClose();
-        } else {
-          toast.showToast(res.data.message || 'Erreur', 'error');
         }
       } else {
         const res = await apiClient.post('/admin/users', form);
@@ -97,6 +122,13 @@ const UserFormModal: React.FC<{ initialUser?: User | null; onClose: () => void }
               <input name="phone" value={form.phone} onChange={onChange} className="input w-full" placeholder="Téléphone (+224...)" required />
               {errors.phone && <div className="text-xs text-red-600">{errors.phone}</div>}
             </div>
+            {!initialUser && (
+              <div>
+                <label className="block text-sm text-gray-600">Mot de passe</label>
+                <input name="password" value={(form as any).password || ''} onChange={onChange} className="input w-full" placeholder="Mot de passe" type="password" />
+                {errors.password && <div className="text-xs text-red-600">{errors.password}</div>}
+              </div>
+            )}
             <div className="flex gap-2 items-center">
               <label className="block text-sm text-gray-600">Rôle</label>
               <select name="role" value={form.role} onChange={onChange} className="input">
